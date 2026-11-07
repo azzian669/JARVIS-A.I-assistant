@@ -50,8 +50,8 @@ Python · Ollama (Phi-3) · ChromaDB · openWakeWord · SpeechRecognition · pyt
 **Setup**
 
 ```bash
-git clone https://github.com/<your-username>/jarvis-local-assistant.git
-cd jarvis-local-assistant
+git clone https://github.com/azzian669/JARVIS-A.I-assistant.git
+cd JARVIS-A.I-assistant
 
 python -m venv .venv
 .venv\Scripts\activate
