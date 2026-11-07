@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S. HUD v3.2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background:#020b14;
+    color:#00d4ff;
+    font-family:'Rajdhani',sans-serif;
+    overflow:hidden;
+    width:100vw;
+    height:100vh;
+    user-select:none;
+  }
+
+  :root {
+    --cyan:#00d4ff;
+    --cyan-dim:rgba(0,212,255,0.15);
+    --amber:#ffb300;
+    --amber-dim:rgba(255,179,0,0.15);
+    --red:#ff3a3a;
+    --green:#00ff88;
+    --panel:rgba(0,20,35,0.88);
+    --border:rgba(0,212,255,0.22);
+  }
+
+  /* scanlines */
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+    pointer-events:none;
+    z-index:9999;
+  }
+
+  .grid-bg {
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,212,255,0.035) 1px,transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none;
+  }
+
+  .hud {
+    position:relative;
+    width:100vw;
+    height:100vh;
+    display:grid;
+    grid-template-columns:260px 1fr 260px;
+    grid-template-rows:48px 1fr 145px 34px;
+    gap:5px;
+    padding:7px;
+    z-index:1;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:1px solid var(--border);
+    padding:0 12px 6px;
+  }
+  .topbar-logo {
+    font-family:'Share Tech Mono',monospace;
+    font-size:18px;
+    letter-spacing:8px;
+    color:var(--cyan);
+  }
+  .topbar-meta {
+    font-family:'Share Tech Mono',monospace;
+    font-size:11px;
+    color:rgba(0,212,255,0.55);
+    text-align:center;
+  }
+  .topbar-time {
+    font-family:'Share Tech Mono',monospace;
+    font-size:20px;
+    color:var(--cyan);
+    letter-spacing:3px;
+  }
+
+  /* PANELS */
+  .panel {
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:2px;
+    padding:9px 11px;
+    position:relative;
+    overflow:hidden;
+  }
+  .panel::before {
+    content:'';
+    position:absolute;
+    top:0; left:0;
+    width:2px; height:100%;
+    background:linear-gradient(180deg,var(--cyan),transparent);
+  }
+  .panel-title {
+    font-size:9px;
+    letter-spacing:3px;
+    color:rgba(0,212,255,0.45);
+    text-transform:uppercase;
+    margin-bottom:9px;
+    font-family:'Share Tech Mono',monospace;
+  }
+
+  /* COLUMNS */
+  .left-col  { grid-column:1; grid-row:2/4; display:flex; flex-direction:column; gap:5px; }
+  .right-col { grid-column:3; grid-row:2/4; display:flex; flex-direction:column; gap:5px; }
+  .center-main { grid-column:2; grid-row:2; display:flex; align-items:center; justify-content:center; position:relative; }
+
+  .center-bottom {
+    grid-column:2; grid-row:3;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:2px;
+    padding:9px 13px;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    position:relative;
+    overflow:hidden;
+  }
+  .center-bottom::before {
+    content:'';
+    position:absolute;
+    top:0; left:0; right:0;
+    height:2px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  }
+
+  .statusbar {
+    grid-column:1/-1;
+    display:flex;
+    align-items:center;
+    gap:18px;
+    padding:0 12px;
+    border-top:1px solid var(--border);
+    font-family:'Share Tech Mono',monospace;
+    font-size:10px;
+    color:rgba(0,212,255,0.4);
+  }
+
+  /* METRIC */
+  .metric-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:3px; }
+  .metric-label { font-size:9px; letter-spacing:2px; color:rgba(0,212,255,0.4); font-family:'Share Tech Mono',monospace; }
+  .metric-val   { font-size:15px; font-weight:600; color:var(--cyan); font-family:'Share Tech Mono',monospace; }
+  .metric-val.warn { color:var(--amber); }
+  .metric-val.crit { color:var(--red);   }
+
+  .bar-track { height:3px; background:rgba(0,212,255,0.1); margin-bottom:9px; overflow:hidden; }
+  .bar-fill  { height:100%; background:var(--cyan); transition:width 1.5s ease; position:relative; }
+  .bar-fill::after { content:''; position:absolute; right:0; top:0; width:3px; height:100%; background:white; opacity:0.7; }
+  .bar-fill.warn { background:var(--amber); }
+  .bar-fill.crit { background:var(--red);   }
+
+  /* AGENTS */
+  .agent-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:3px 0; border-bottom:1px solid rgba(0,212,255,0.07);
+  }
+  .agent-name { font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(0,212,255,0.65); }
+  .agent-pill { font-family:'Share Tech Mono',monospace; font-size:8px; padding:2px 6px; border-radius:1px; letter-spacing:1px; }
+  .pill-online  { background:rgba(0,255,136,0.12);  color:var(--green);  border:1px solid rgba(0,255,136,0.28); }
+  .pill-standby { background:var(--amber-dim);       color:var(--amber);  border:1px solid rgba(255,179,0,0.28); }
+  .pill-offline { background:rgba(255,58,58,0.1);   color:var(--red);    border:1px solid rgba(255,58,58,0.2);  }
+  .pill-idle    { background:rgba(0,212,255,0.08);  color:rgba(0,212,255,0.5); border:1px solid var(--border); }
+
+  /* GAUGE */
+  .gauge-row    { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+  .gauge-label  { font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(0,212,255,0.4); width:32px; }
+  .gauge-bar    { flex:1; height:3px; background:rgba(0,212,255,0.1); }
+  .gauge-fill   { height:100%; background:linear-gradient(90deg,var(--cyan),var(--amber)); transition:width 2s ease; }
+  .gauge-val    { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--cyan); width:34px; text-align:right; }
+
+  /* MODULES */
+  .activity-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:3px; margin-top:4px; }
+  .activity-node {
+    background:var(--cyan-dim);
+    border:1px solid var(--border);
+    border-radius:1px;
+    padding:5px 3px;
+    text-align:center;
+    font-size:8px;
+    font-family:'Share Tech Mono',monospace;
+    letter-spacing:1px;
+    color:rgba(0,212,255,0.5);
+    cursor:pointer;
+    transition:all 0.2s;
+  }
+  .activity-node.active   { background:rgba(0,212,255,0.22); border-color:var(--cyan); color:var(--cyan); animation:nodeFlash 2s infinite; }
+  .activity-node.inactive { background:rgba(255,58,58,0.06); border-color:rgba(255,58,58,0.2); color:rgba(255,58,58,0.5); }
+  .activity-node:hover    { background:rgba(0,212,255,0.3); color:var(--cyan); border-color:var(--cyan); }
+
+  /* LOG */
+  .log-stream { font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(0,212,255,0.5); line-height:1.75; overflow:hidden; flex:1; }
+  .log-line   { display:flex; gap:7px; animation:fadeIn 0.3s ease; }
+  .log-time   { color:rgba(0,212,255,0.28); flex-shrink:0; }
+  .log-ok     { color:var(--green);  flex-shrink:0; }
+  .log-warn   { color:var(--amber);  flex-shrink:0; }
+  .log-info   { color:var(--cyan);   flex-shrink:0; }
+  .log-cmd    { color:var(--amber);  flex-shrink:0; }
+  .log-error  { color:var(--red);    flex-shrink:0; }
+
+  /* CMD INPUT */
+  .cmd-row    { display:flex; align-items:center; gap:7px; border-top:1px solid var(--border); padding-top:7px; }
+  .cmd-prefix { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--cyan); }
+  .cmd-input  { flex:1; background:transparent; border:none; outline:none; font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--cyan); caret-color:var(--cyan); }
+  .cmd-input::placeholder { color:rgba(0,212,255,0.22); }
+
+  /* ARC */
+  .arc-reactor { position:relative; width:210px; height:210px; }
+  .arc-reactor svg { position:absolute; inset:0; }
+  .arc-label  { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
+  .arc-label .operator   { font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(0,212,255,0.45); letter-spacing:3px; }
+  .arc-label .status-text { font-size:20px; font-weight:700; letter-spacing:4px; color:var(--cyan); transition:color 0.5s; }
+  .arc-label .mode-text  { font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,212,255,0.4); letter-spacing:2px; }
+
+  .corner-tl,.corner-tr,.corner-bl,.corner-br { position:absolute; width:10px; height:10px; border-color:var(--cyan); border-style:solid; opacity:0.6; }
+  .corner-tl { top:0; left:0; border-width:1px 0 0 1px; }
+  .corner-tr { top:0; right:0; border-width:1px 1px 0 0; }
+  .corner-bl { bottom:0; left:0; border-width:0 0 1px 1px; }
+  .corner-br { bottom:0; right:0; border-width:0 1px 1px 0; }
+
+  /* QUICK LAUNCH */
+  .ql-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px; margin-top:4px; }
+  .ql-btn {
+    background:var(--cyan-dim); border:1px solid var(--border); border-radius:1px;
+    padding:5px 3px; text-align:center; font-size:8px;
+    font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(0,212,255,0.6);
+    cursor:pointer; transition:all 0.2s;
+  }
+  .ql-btn:hover { background:rgba(0,212,255,0.28); border-color:var(--cyan); color:var(--cyan); }
+
+  /* STATUS DOT */
+  .status-dot { width:5px; height:5px; border-radius:50%; background:var(--green); display:inline-block; margin-right:5px; animation:pulse 2s infinite; }
+  .status-dot.red    { background:var(--red); }
+  .status-dot.amber  { background:var(--amber); }
+
+  /* ANIMATIONS */
+  @keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes spin-slow { from{transform:rotate(0deg)}   to{transform:rotate(360deg)}  }
+  @keyframes spin-rev  { from{transform:rotate(360deg)} to{transform:rotate(0deg)}    }
+  @keyframes nodeFlash { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  @keyframes fadeIn    { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+
+  .ring-1 { animation:spin-slow 14s linear infinite; transform-origin:110px 110px; }
+  .ring-2 { animation:spin-rev   9s linear infinite; transform-origin:110px 110px; }
+  .ring-3 { animation:spin-slow 22s linear infinite; transform-origin:110px 110px; }
+
+  /* CONNECTION BANNER */
+  #conn-banner {
+    position:fixed; top:55px; left:50%; transform:translateX(-50%);
+    background:rgba(255,100,0,0.15); border:1px solid rgba(255,100,0,0.4);
+    color:rgba(255,140,0,0.9); font-family:'Share Tech Mono',monospace; font-size:10px;
+    padding:4px 18px; border-radius:2px; z-index:1000; display:none; letter-spacing:2px;
+  }
+
+  /* SPARK */
+  .spark-container { height:48px; position:relative; }
+  .waveform-container { height:38px; position:relative; }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div id="conn-banner">⚠ JARVIS OFFLINE — START jarvis_server.py TO CONNECT</div>
+
+<div class="hud">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-logo">J.A.R.V.I.S</div>
+    <div class="topbar-meta">
+      <div>JUST A RATHER VERY INTELLIGENT SYSTEM &nbsp;·&nbsp; v3.2</div>
+      <div style="color:rgba(0,212,255,0.3);font-size:9px;margin-top:2px;">OPERATOR: LOCAL USER &nbsp;|&nbsp; LOCAL SESSION</div>
+    </div>
+    <div class="topbar-time" id="clock">00:00:00</div>
+  </div>
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-title">◈ SYSTEM TELEMETRY</div>
+      <div class="metric-row"><span class="metric-label">CPU</span><span class="metric-val" id="cpu-val">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="cpu-bar" style="width:0%"></div></div>
+      <div class="metric-row"><span class="metric-label">RAM</span><span class="metric-val" id="ram-val">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="ram-bar" style="width:0%"></div></div>
+      <div class="metric-row"><span class="metric-label">DISK</span><span class="metric-val" id="disk-val">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="disk-bar" style="width:0%"></div></div>
+      <div class="metric-row"><span class="metric-label">GPU</span><span class="metric-val" style="font-size:11px;">RTX 3050</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:38%"></div></div>
+    </div>
+
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-title">◈ THERMAL READOUT</div>
+      <div class="gauge-row">
+        <span class="gauge-label">CPU</span>
+        <div class="gauge-bar"><div class="gauge-fill" id="temp-cpu-bar" style="width:50%"></div></div>
+        <span class="gauge-val" id="temp-cpu-val">--°C</span>
+      </div>
+      <div class="gauge-row">
+        <span class="gauge-label">GPU</span>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:38%"></div></div>
+        <span class="gauge-val">38°C</span>
+      </div>
+      <div class="gauge-row">
+        <span class="gauge-label">SYS</span>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:32%"></div></div>
+        <span class="gauge-val">32°C</span>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1;">
+      <div class="panel-title">◈ AGENT NETWORK</div>
+      <div id="agent-list">
+        <div class="agent-row"><span class="agent-name">CORE / PHI-3</span><span class="agent-pill pill-online" id="ag-0">ONLINE</span></div>
+        <div class="agent-row"><span class="agent-name">MEMORY / CHROMA</span><span class="agent-pill pill-online" id="ag-1">ONLINE</span></div>
+        <div class="agent-row"><span class="agent-name">WAKE / OWW</span><span class="agent-pill pill-standby" id="ag-2">STANDBY</span></div>
+        <div class="agent-row"><span class="agent-name">VISION / OCR</span><span class="agent-pill pill-idle" id="ag-3">IDLE</span></div>
+        <div class="agent-row"><span class="agent-name">TELEGRAM</span><span class="agent-pill pill-offline" id="ag-4">OFFLINE</span></div>
+        <div class="agent-row"><span class="agent-name">GMAIL</span><span class="agent-pill pill-offline" id="ag-5">OFFLINE</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER MAIN -->
+  <div class="center-main">
+    <div class="arc-reactor">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="110" cy="110" r="105" fill="none" stroke="rgba(0,212,255,0.07)" stroke-width="1"/>
+        <circle cx="110" cy="110" r="97"  fill="none" stroke="rgba(0,212,255,0.10)" stroke-width="0.5"/>
+        <g class="ring-1">
+          <circle cx="110" cy="110" r="90" fill="none" stroke="rgba(0,212,255,0.22)" stroke-width="1" stroke-dasharray="8 6"/>
+        </g>
+        <g class="ring-2">
+          <circle cx="110" cy="110" r="78" fill="none" stroke="rgba(0,212,255,0.18)" stroke-width="1.5" stroke-dasharray="4 14"/>
+        </g>
+        <g stroke="rgba(0,212,255,0.38)" stroke-width="1">
+          <line x1="110" y1="8"   x2="110" y2="18"/>
+          <line x1="110" y1="202" x2="110" y2="212"/>
+          <line x1="8"   y1="110" x2="18"  y2="110"/>
+          <line x1="202" y1="110" x2="212" y2="110"/>
+          <line x1="40"  y1="40"  x2="47"  y2="47"/>
+          <line x1="180" y1="40"  x2="173" y2="47"/>
+          <line x1="40"  y1="180" x2="47"  y2="173"/>
+          <line x1="180" y1="180" x2="173" y2="173"/>
+        </g>
+        <g class="ring-3">
+          <circle cx="110" cy="110" r="63" fill="none" stroke="rgba(0,212,255,0.15)" stroke-width="1"/>
+          <circle cx="110" cy="47"  r="3"  fill="rgba(0,212,255,0.55)"/>
+          <circle cx="110" cy="173" r="3"  fill="rgba(0,212,255,0.55)"/>
+          <circle cx="47"  cy="110" r="3"  fill="rgba(0,212,255,0.55)"/>
+          <circle cx="173" cy="110" r="3"  fill="rgba(0,212,255,0.55)"/>
+        </g>
+        <circle cx="110" cy="110" r="48" fill="rgba(0,212,255,0.04)"/>
+        <circle cx="110" cy="110" r="41" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.32)" stroke-width="1"/>
+        <circle cx="110" cy="110" r="36" fill="rgba(0,212,255,0.07)" id="arc-pulse">
+          <animate attributeName="r" values="33;41;33" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
+        </circle>
+        <line x1="110" y1="69" x2="110" y2="151" stroke="rgba(0,212,255,0.12)" stroke-width="0.5"/>
+        <line x1="74"  y1="90" x2="146" y2="130" stroke="rgba(0,212,255,0.12)" stroke-width="0.5"/>
+        <line x1="74"  y1="130" x2="146" y2="90" stroke="rgba(0,212,255,0.12)" stroke-width="0.5"/>
+        <circle cx="110" cy="110" r="6" fill="rgba(0,212,255,0.88)" id="arc-core">
+          <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="110" cy="110" r="3" fill="white" opacity="0.75"/>
+      </svg>
+      <div class="arc-label">
+        <span class="operator">OPERATOR</span>
+        <span class="status-text" id="main-status">STANDBY</span>
+        <span class="mode-text" id="mode-text">AWAITING COMMAND</span>
+      </div>
+    </div>
+
+    <div style="position:absolute;inset:22px;pointer-events:none;">
+      <div class="corner-tl"></div><div class="corner-tr"></div>
+      <div class="corner-bl"></div><div class="corner-br"></div>
+    </div>
+
+    <div style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,212,255,0.3);line-height:2.1;">
+      <div>V.3.2</div>
+      <div id="uptime-side">UP:00:00</div>
+      <div id="conn-side">OFFLINE</div>
+      <div>SECURE</div>
+    </div>
+
+    <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,212,255,0.3);line-height:2.1;text-align:right;">
+      <div>PHI-3</div>
+      <div>CHROMA</div>
+      <div>OWW</div>
+      <div>PSUTIL</div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-title">◈ MODULE STATUS</div>
+      <div class="activity-grid">
+        <div class="activity-node active"   id="mod-WAKE">WAKE</div>
+        <div class="activity-node active"   id="mod-TTS">TTS</div>
+        <div class="activity-node active"   id="mod-MEM">MEM</div>
+        <div class="activity-node active"   id="mod-LLM">LLM</div>
+        <div class="activity-node inactive" id="mod-VISION">VISION</div>
+        <div class="activity-node inactive" id="mod-TEL">TEL</div>
+        <div class="activity-node inactive" id="mod-MAIL">MAIL</div>
+        <div class="activity-node inactive" id="mod-PHONE">PHONE</div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-title">◈ AUDIO SENSOR</div>
+      <div class="waveform-container">
+        <canvas id="waveCanvas" width="230" height="38"></canvas>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px;">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,212,255,0.38);" id="mic-label">MIC: STANDBY</span>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,255,136,0.55);" id="wake-conf">WAKE: 0.00</span>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:0 0 auto;">
+      <div class="panel-title">◈ CPU TREND</div>
+      <div class="spark-container">
+        <canvas id="sparkCanvas" width="230" height="48"></canvas>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1;">
+      <div class="panel-title">◈ QUICK LAUNCH</div>
+      <div class="ql-grid">
+        <div class="ql-btn" onclick="sendCmd('open youtube')">▶ YT</div>
+        <div class="ql-btn" onclick="sendCmd('open spotify')">♪ SPTFY</div>
+        <div class="ql-btn" onclick="sendCmd('open vs code')">⌨ VSCODE</div>
+        <div class="ql-btn" onclick="sendCmd('system status')">⚡ STATUS</div>
+        <div class="ql-btn" onclick="sendCmd('open discord')">◉ DSCRD</div>
+        <div class="ql-btn" onclick="sendCmd('open calculator')">∑ CALC</div>
+      </div>
+      <div style="margin-top:9px;font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,212,255,0.28);line-height:1.9;">
+        <div>DATE: <span id="date-display" style="color:rgba(0,212,255,0.55);">--</span></div>
+        <div>LOC:  LOCALHOST</div>
+        <div>API:  <span id="api-status" style="color:var(--red);">DISCONNECTED</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER BOTTOM -->
+  <div class="center-bottom">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,212,255,0.38);letter-spacing:2px;">◈ SYSTEM LOG &nbsp;/&nbsp; COMMAND INTERFACE</div>
+    <div class="log-stream" id="log-stream"></div>
+    <div class="cmd-row">
+      <span class="cmd-prefix">JARVIS &gt;</span>
+      <input class="cmd-input" id="cmd-input" type="text" placeholder="type a command or question..." autocomplete="off"/>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <span><span class="status-dot" id="sys-dot"></span><span id="sys-label">CONNECTING...</span></span>
+    <span>MODEL: PHI-3</span>
+    <span>MEM: CHROMADB</span>
+    <span>TTS: PYTTSX3</span>
+    <span>WAKE: OWW 0.5</span>
+    <span style="margin-left:auto;" id="status-time">--</span>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5000';
+let connected = false;
+let logIndex  = 0;
+let cpuHistory = Array(30).fill(20);
+let wavePhase  = 0;
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+// ---- CLOCK ----
+function updateClock(){
+  const now = new Date();
+  const ts = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  document.getElementById('clock').textContent = ts;
+  document.getElementById('status-time').textContent = ts;
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  document.getElementById('date-display').textContent =
+    days[now.getDay()]+' '+pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ---- FETCH STATE ----
+async function fetchState(){
+  try {
+    const r = await fetch(API+'/api/state', {signal: AbortSignal.timeout(2000)});
+    if(!r.ok) throw new Error('bad response');
+    const d = await r.json();
+    connected = true;
+    applyState(d);
+  } catch(e) {
+    connected = false;
+    setOffline();
+  }
+}
+
+function applyState(d){
+  // Telemetry
+  const t = d.telemetry;
+  setMetric('cpu', t.cpu);
+  setMetric('ram', t.ram);
+  setMetric('disk', t.disk);
+  cpuHistory.push(t.cpu);
+  cpuHistory.shift();
+
+  if(t.cpu_temp !== null && t.cpu_temp !== undefined){
+    document.getElementById('temp-cpu-val').textContent = t.cpu_temp+'°C';
+    document.getElementById('temp-cpu-bar').style.width = Math.min(t.cpu_temp, 100)+'%';
+  }
+
+  // Arc status
+  const statusEl = document.getElementById('main-status');
+  const modeEl   = document.getElementById('mode-text');
+  statusEl.textContent = d.status;
+  modeEl.textContent   = d.mode_text;
+  statusEl.style.color = d.status === 'ACTIVE' ? '#00ff88'
+                       : d.status === 'THINKING' ? '#ffb300'
+                       : '#00d4ff';
+
+  // Wake confidence
+  document.getElementById('wake-conf').textContent = 'WAKE: '+d.wake_confidence.toFixed(2);
+  document.getElementById('mic-label').textContent  = d.mic_active ? 'MIC: ACTIVE' : 'MIC: STANDBY';
+
+  // Uptime
+  const u = d.uptime_secs;
+  const h = Math.floor(u/3600), m = Math.floor((u%3600)/60);
+  document.getElementById('uptime-side').textContent = 'UP:'+pad(h)+':'+pad(m);
+
+  // Modules
+  for(const [name, active] of Object.entries(d.modules)){
+    const el = document.getElementById('mod-'+name);
+    if(el){
+      el.className = 'activity-node ' + (active ? 'active' : 'inactive');
+    }
+  }
+
+  // Agents
+  const agentEls = document.querySelectorAll('[id^="ag-"]');
+  const agentEntries = Object.entries(d.agents);
+  agentEntries.forEach(([name, status], i) => {
+    const el = document.getElementById('ag-'+i);
+    if(!el) return;
+    el.textContent = status;
+    el.className = 'agent-pill ' + (
+      status === 'ONLINE'  ? 'pill-online'  :
+      status === 'STANDBY' ? 'pill-standby' :
+      status === 'IDLE'    ? 'pill-idle'    : 'pill-offline'
+    );
+  });
+
+  // Connection OK
+  document.getElementById('conn-banner').style.display = 'none';
+  document.getElementById('api-status').textContent = 'CONNECTED';
+  document.getElementById('api-status').style.color = 'var(--green)';
+  document.getElementById('conn-side').textContent   = 'ONLINE';
+  document.getElementById('conn-side').style.color   = 'rgba(0,255,136,0.6)';
+  document.getElementById('sys-dot').className        = 'status-dot';
+  document.getElementById('sys-label').textContent   = 'SYSTEM NOMINAL';
+}
+
+function setOffline(){
+  document.getElementById('conn-banner').style.display = 'block';
+  document.getElementById('api-status').textContent = 'DISCONNECTED';
+  document.getElementById('api-status').style.color = 'var(--red)';
+  document.getElementById('conn-side').textContent  = 'OFFLINE';
+  document.getElementById('conn-side').style.color  = 'rgba(255,58,58,0.7)';
+  document.getElementById('sys-dot').className       = 'status-dot red';
+  document.getElementById('sys-label').textContent  = 'JARVIS OFFLINE';
+  // Animate telemetry when offline (demo mode)
+  const fake = { cpu: 15+Math.random()*35, ram: 45+Math.random()*15, disk: 60+Math.random()*10 };
+  setMetric('cpu', fake.cpu);
+  setMetric('ram', fake.ram);
+  setMetric('disk', fake.disk);
+  cpuHistory.push(Math.round(fake.cpu));
+  cpuHistory.shift();
+}
+
+function setMetric(name, val){
+  const v = Math.round(val);
+  const el  = document.getElementById(name+'-val');
+  const bar = document.getElementById(name+'-bar');
+  if(el)  el.textContent = v+'%';
+  if(el)  el.className   = 'metric-val'+(v>80?' crit':v>60?' warn':'');
+  if(bar) bar.style.width = v+'%';
+  if(bar) bar.className   = 'bar-fill'+(v>80?' crit':v>60?' warn':'');
+}
+
+setInterval(fetchState, 2000);
+fetchState();
+
+// ---- FETCH LOGS ----
+async function fetchLogs(){
+  if(!connected) return;
+  try {
+    const r = await fetch(API+'/api/logs?since='+logIndex, {signal: AbortSignal.timeout(2000)});
+    const d = await r.json();
+    if(d.logs && d.logs.length){
+      d.logs.forEach(addLogLine);
+      logIndex += d.logs.length;
+    }
+  } catch(e){}
+}
+
+function addLogLine(entry){
+  const stream = document.getElementById('log-stream');
+  const line   = document.createElement('div');
+  line.className = 'log-line';
+  const cls = {ok:'log-ok', warn:'log-warn', info:'log-info', cmd:'log-cmd', error:'log-error'}[entry.level] || 'log-info';
+  line.innerHTML = `<span class="log-time">[${entry.time}]</span><span class="${cls}">${entry.tag}</span><span>${entry.message}</span>`;
+  stream.appendChild(line);
+  while(stream.children.length > 9) stream.removeChild(stream.firstChild);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+// Seed offline log
+function seedLog(){
+  const now = new Date();
+  const t = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  const lines = [
+    {time:t, tag:'[OK]',   level:'ok',   message:'J.A.R.V.I.S. v3.2 HUD loaded.'},
+    {time:t, tag:'[WARN]', level:'warn', message:'API offline — start jarvis_server.py'},
+    {time:t, tag:'[INF]',  level:'info', message:'Running in demo mode.'},
+  ];
+  lines.forEach(addLogLine);
+}
+seedLog();
+setInterval(fetchLogs, 3000);
+
+// ---- SEND COMMAND ----
+async function sendCmd(cmd){
+  // Show in log immediately
+  const now = new Date();
+  const t = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  addLogLine({time:t, tag:'[CMD]', level:'cmd', message:'"'+cmd+'"'});
+
+  document.getElementById('main-status').textContent = 'ACTIVE';
+  document.getElementById('mode-text').textContent   = 'PROCESSING...';
+
+  if(!connected){
+    setTimeout(()=>{
+      document.getElementById('main-status').textContent = 'STANDBY';
+      document.getElementById('mode-text').textContent   = 'AWAITING COMMAND';
+    }, 2000);
+    addLogLine({time:t, tag:'[ERR]', level:'error', message:'JARVIS offline — cannot execute.'});
+    return;
+  }
+
+  try {
+    const r = await fetch(API+'/api/command', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({command: cmd}),
+      signal: AbortSignal.timeout(30000)
+    });
+    const d = await r.json();
+    const rt = new Date(); const rt2 = pad(rt.getHours())+':'+pad(rt.getMinutes())+':'+pad(rt.getSeconds());
+    addLogLine({time:rt2, tag:d.routed?'[RTR]':'[LLM]', level:'ok', message: d.response.slice(0,100)});
+  } catch(e){
+    addLogLine({time:t, tag:'[ERR]', level:'error', message:'Command failed: '+e.message});
+  }
+
+  setTimeout(()=>{
+    document.getElementById('main-status').textContent = 'STANDBY';
+    document.getElementById('mode-text').textContent   = 'AWAITING COMMAND';
+  }, 1500);
+}
+
+// ---- CMD INPUT ----
+document.getElementById('cmd-input').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && this.value.trim()){
+    sendCmd(this.value.trim());
+    this.value = '';
+  }
+});
+
+// ---- WAVEFORM ----
+const wCtx = document.getElementById('waveCanvas').getContext('2d');
+function drawWave(){
+  const cv = document.getElementById('waveCanvas');
+  wCtx.clearRect(0,0,cv.width,cv.height);
+  wCtx.strokeStyle = 'rgba(0,212,255,0.45)';
+  wCtx.lineWidth = 1;
+  wCtx.beginPath();
+  for(let x=0; x<cv.width; x++){
+    const amp = 7 + Math.random()*3;
+    const y = cv.height/2 + Math.sin((x/cv.width)*Math.PI*6+wavePhase)*amp*(0.5+Math.random()*0.5);
+    x===0 ? wCtx.moveTo(x,y) : wCtx.lineTo(x,y);
+  }
+  wCtx.stroke();
+  wavePhase += 0.09;
+}
+setInterval(drawWave, 60);
+
+// ---- SPARKLINE ----
+const sCtx = document.getElementById('sparkCanvas').getContext('2d');
+function drawSpark(){
+  const cv = document.getElementById('sparkCanvas');
+  sCtx.clearRect(0,0,cv.width,cv.height);
+  const max = Math.max(...cpuHistory, 10);
+  sCtx.strokeStyle = 'rgba(0,212,255,0.55)';
+  sCtx.lineWidth = 1.5;
+  sCtx.beginPath();
+  cpuHistory.forEach((v,i)=>{
+    const x = (i/(cpuHistory.length-1))*cv.width;
+    const y = cv.height - (v/100)*cv.height;
+    i===0 ? sCtx.moveTo(x,y) : sCtx.lineTo(x,y);
+  });
+  sCtx.stroke();
+  sCtx.fillStyle = 'rgba(0,212,255,0.06)';
+  sCtx.lineTo(cv.width, cv.height);
+  sCtx.lineTo(0, cv.height);
+  sCtx.closePath();
+  sCtx.fill();
+}
+setInterval(drawSpark, 2000);
+drawSpark();
+</script>
+</body>
+</html>

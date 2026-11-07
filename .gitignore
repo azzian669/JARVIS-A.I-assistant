@@ -1,0 +1,35 @@
+# Secrets and local config
+.env
+*.key
+*.pem
+secrets/
+credentials*.json
+token*.json
+
+# Private persona and personal runtime data
+persona.txt
+memory*.json
+jarvis_memory/
+logs/
+*.log
+response.mp3
+*.wav
+
+# Models and large assets
+models/
+*.onnx
+*.tflite
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+# Unpinned. Run `pip freeze` in your working environment and pin versions before release.
+flask
+flask-cors
+psutil
+pygame
+pyttsx3
+requests
+numpy
+chromadb
+openwakeword
+SpeechRecognition
+PyAudio
