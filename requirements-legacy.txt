@@ -1,0 +1,9 @@
+google-generativeai
+edge-tts
+pygame
+SpeechRecognition
+PyAudio
+pytesseract
+pyautogui
+psutil
+python-dotenv
